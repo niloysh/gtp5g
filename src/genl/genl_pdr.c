@@ -29,6 +29,7 @@ static int gtp5g_genl_fill_sdf(struct sk_buff *, struct sdf_filter *);
 static int gtp5g_genl_fill_f_teid(struct sk_buff *, struct local_f_teid *);
 static int gtp5g_genl_fill_pdi(struct sk_buff *, struct pdi *);
 static int gtp5g_genl_fill_pdr(struct sk_buff *, u32, u32, u32, struct pdr *);
+static int gtp5g_genl_fill_pdr_stats(struct sk_buff *, u32, u32, u32, struct pdr *);
 
 int gtp5g_genl_add_pdr(struct sk_buff *skb, struct genl_info *info)
 {
@@ -261,7 +262,7 @@ int gtp5g_genl_get_pdr(struct sk_buff *skb, struct genl_info *info)
     rcu_read_unlock();
 
     return genlmsg_unicast(genl_info_net(info), skb_ack, info->snd_portid);
-}  
+}
 
 int gtp5g_genl_dump_pdr(struct sk_buff *skb, struct netlink_callback *cb)
 {
@@ -315,6 +316,59 @@ int gtp5g_genl_dump_pdr(struct sk_buff *skb, struct netlink_callback *cb)
 out:
     return skb->len;
 }  
+
+int gtp5g_genl_dump_pdr_stats(struct sk_buff *skb, struct netlink_callback *cb)
+{
+    /* netlink_callback->args
+     * args[0] : index of gtp5g dev id
+     * args[1] : index of gtp5g hash entry id in dev
+     * args[2] : index of gtp5g pdr id
+     * args[5] : set non-zero means it is finished
+     */
+    struct gtp5g_dev *gtp;
+    struct gtp5g_dev *last_gtp = (struct gtp5g_dev *)cb->args[0];
+    struct net *net = sock_net(skb->sk);
+    struct gtp5g_net *gn = net_generic(net, GTP5G_NET_ID());
+    int i;
+    int last_hash_entry_id = cb->args[1];
+    int ret;
+    u16 pdr_id = cb->args[2];
+    struct pdr *pdr;
+
+    if (cb->args[5])
+        return 0;
+
+    list_for_each_entry_rcu(gtp, &gn->gtp5g_dev_list, list) {
+        if (last_gtp && last_gtp != gtp)
+            continue;
+        else
+            last_gtp = NULL;
+
+        for (i = last_hash_entry_id; i < gtp->hash_size; i++) {
+            hlist_for_each_entry_rcu(pdr, &gtp->pdr_id_hash[i], hlist_id) {
+                if (pdr_id && pdr_id != pdr->id)
+                    continue;
+                else
+                    pdr_id = 0;
+
+                ret = gtp5g_genl_fill_pdr_stats(skb,
+                        NETLINK_CB(cb->skb).portid,
+                        cb->nlh->nlmsg_seq,
+                        cb->nlh->nlmsg_type,
+                        pdr);
+                if (ret) {
+                    cb->args[0] = (unsigned long)gtp;
+                    cb->args[1] = i;
+                    cb->args[2] = pdr->id;
+                    goto out;
+                }
+            }
+        }
+    }
+    cb->args[5] = 1;
+out:
+    return skb->len;
+}
 
 int find_qer_id_in_pdr(struct pdr *pdr, u32 qer_id)
 {
@@ -923,3 +977,38 @@ genlmsg_fail:
     genlmsg_cancel(skb, genlh);
     return -EMSGSIZE;
 }
+
+static int gtp5g_genl_fill_pdr_stats(struct sk_buff *skb, u32 snd_portid, u32 snd_seq,
+        u32 type, struct pdr *pdr)
+{
+    void *genlh;
+
+    genlh = genlmsg_put(skb, snd_portid, snd_seq, &gtp5g_genl_family, 0, type);
+    if (!genlh)
+        goto genlmsg_fail;
+
+    if (nla_put_u16(skb, GTP5G_PDR_STATS_PDR_ID, pdr->id))
+        goto genlmsg_fail;
+
+    if (nla_put_u64_64bit(skb, GTP5G_PDR_STATS_PDR_SEID, pdr->seid, 0))
+        goto genlmsg_fail;
+
+    if (nla_put_u64_64bit(skb, GTP5G_PDR_STATS_UL_PKT_CNT, pdr->ul_pkt_cnt, 0))
+        goto genlmsg_fail;
+
+    if (nla_put_u64_64bit(skb, GTP5G_PDR_STATS_DL_PKT_CNT, pdr->dl_pkt_cnt, 0))
+        goto genlmsg_fail;
+
+    if (nla_put_u64_64bit(skb, GTP5G_PDR_STATS_UL_BYTE_CNT, pdr->ul_byte_cnt, 0))
+        goto genlmsg_fail;
+
+    if (nla_put_u64_64bit(skb, GTP5G_PDR_STATS_DL_BYTE_CNT, pdr->dl_byte_cnt, 0))
+        goto genlmsg_fail;
+
+    genlmsg_end(skb, genlh);
+    return 0;
+genlmsg_fail:
+    genlmsg_cancel(skb, genlh);
+    return -EMSGSIZE;
+}
+

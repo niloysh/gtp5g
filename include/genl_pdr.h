@@ -93,9 +93,22 @@ enum {
 };
 #define GTP5G_SDF_FILTER_DIRECTION_MAX (__GTP5G_SDF_FILTER_DIRECTION_MAX - 1)
 
+enum gtp5g_pdr_stats_attrs {
+    GTP5G_PDR_STATS_PDR_ID = 1,
+    GTP5G_PDR_STATS_PDR_SEID,
+    GTP5G_PDR_STATS_UL_PKT_CNT,
+    GTP5G_PDR_STATS_DL_PKT_CNT,
+    GTP5G_PDR_STATS_UL_BYTE_CNT,
+    GTP5G_PDR_STATS_DL_BYTE_CNT,
+
+    __GTP5G_PDR_STATS_ATTR_MAX,
+};
+#define GTP5G_PDR_STATS_ATTR_MAX (__GTP5G_PDR_STATS_ATTR_MAX - 1)
+
 extern int gtp5g_genl_add_pdr(struct sk_buff *, struct genl_info *);
 extern int gtp5g_genl_del_pdr(struct sk_buff *, struct genl_info *);
 extern int gtp5g_genl_get_pdr(struct sk_buff *, struct genl_info *);
 extern int gtp5g_genl_dump_pdr(struct sk_buff *, struct netlink_callback *);
+extern int gtp5g_genl_dump_pdr_stats(struct sk_buff *, struct netlink_callback *);
 
 #endif // __GENL_PDR_H__

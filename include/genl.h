@@ -38,6 +38,8 @@ enum gtp5g_cmd {
 
     GTP5G_CMD_GET_MULTI_REPORTS,
 
+    GTP5G_CMD_GET_PDR_STATS,
+
     __GTP5G_CMD_MAX,
 };
 #define GTP5G_CMD_MAX (__GTP5G_CMD_MAX - 1)

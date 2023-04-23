@@ -162,6 +162,11 @@ static const struct genl_ops gtp5g_genl_ops[] = {
         .doit = gtp5g_genl_get_multi_usage_reports,
         .flags = GENL_ADMIN_PERM,
     },
+    {
+        .cmd = GTP5G_CMD_GET_PDR_STATS,
+        .dumpit = gtp5g_genl_dump_pdr_stats,
+        .flags = GENL_ADMIN_PERM,
+    },
 };
 
 static const struct genl_multicast_group gtp5g_genl_mcgrps[] = {
